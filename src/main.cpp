@@ -15,7 +15,6 @@ constexpr uint8_t BME688_CHIP_ID_REGISTER = 0xD0;
 constexpr uint8_t BME688_VARIANT_ID_REGISTER = 0xF0;
 
 constexpr unsigned long SENSOR_INTERVAL_MS = 1000;
-constexpr unsigned long WIFI_CONNECT_TIMEOUT_MS = 20000;
 
 Adafruit_BME680 bme;
 WebServer server(80);
@@ -38,27 +37,6 @@ String formatFloat(float value, unsigned int digits) {
     return "--";
   }
   return String(value, digits);
-}
-
-const char* wifiStatusName(wl_status_t status) {
-  switch (status) {
-    case WL_IDLE_STATUS:
-      return "WL_IDLE_STATUS";
-    case WL_NO_SSID_AVAIL:
-      return "WL_NO_SSID_AVAIL";
-    case WL_SCAN_COMPLETED:
-      return "WL_SCAN_COMPLETED";
-    case WL_CONNECTED:
-      return "WL_CONNECTED";
-    case WL_CONNECT_FAILED:
-      return "WL_CONNECT_FAILED";
-    case WL_CONNECTION_LOST:
-      return "WL_CONNECTION_LOST";
-    case WL_DISCONNECTED:
-      return "WL_DISCONNECTED";
-    default:
-      return "UNKNOWN";
-  }
 }
 
 void scanI2cBus() {
@@ -1015,33 +993,26 @@ void handleSensorApi() {
   server.send(200, "application/json", sensorJson());
 }
 
-void connectWiFi() {
-  Serial.println("Wi-Fi connection start");
-  Serial.printf("SSID: %s\n", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+void startAccessPoint() {
+  const IPAddress apIp(192, 168, 4, 1);
+  const IPAddress subnet(255, 255, 255, 0);
 
-  const unsigned long startedAt = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startedAt < WIFI_CONNECT_TIMEOUT_MS) {
-    delay(500);
-    Serial.print(".");
+  Serial.println("Wi-Fi access point start");
+  Serial.printf("SSID: %s\n", AP_SSID);
+  WiFi.mode(WIFI_AP);
+  if (!WiFi.softAPConfig(apIp, apIp, subnet)) {
+    Serial.println("Access point IP configuration failed");
   }
-  Serial.println();
+  if (!WiFi.softAP(AP_SSID, AP_PASSWORD)) {
+    Serial.println("Access point start failed");
+    return;
+  }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("WiFi connected");
-    Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
-    Serial.print("IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.println("Open:");
-    Serial.printf("http://%s/\n", WiFi.localIP().toString().c_str());
-  } else {
-    const wl_status_t status = WiFi.status();
-    Serial.println("Wi-Fi connection failed or timed out");
-    Serial.printf("SSID: %s\n", WIFI_SSID);
-    Serial.printf("Wi-Fi status: %s (%d)\n", wifiStatusName(status), static_cast<int>(status));
-    Serial.println("Check SSID, password, router, and 2.4 GHz network availability.");
-  }
+  Serial.println("Access point ready");
+  Serial.print("IP: ");
+  Serial.println(WiFi.softAPIP());
+  Serial.println("Open:");
+  Serial.println("http://192.168.4.1/");
 }
 
 void setupBme688() {
@@ -1079,12 +1050,8 @@ void setupWebServer() {
   server.on("/api/sensor", HTTP_GET, handleSensorApi);
   server.begin();
   Serial.println("HTTP server started");
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("Web URL:");
-    Serial.printf("http://%s/\n", WiFi.localIP().toString().c_str());
-  } else {
-    Serial.println("Web URL unavailable because Wi-Fi is not connected.");
-  }
+  Serial.println("Web URL:");
+  Serial.println("http://192.168.4.1/");
 }
 
 void setup() {
@@ -1095,7 +1062,7 @@ void setup() {
   Serial.println("Boot start");
 
   setupBme688();
-  connectWiFi();
+  startAccessPoint();
   setupWebServer();
 }
 

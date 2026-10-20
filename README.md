@@ -1,6 +1,6 @@
-# ESP32-S3 BME688 Web Monitor
+# ESP32-S3 BME688 Outdoor Monitor
 
-ESP32-S3 reads a BME688 / SEN0617 sensor over I2C and shows the values on a small Web page.
+ESP32-S3 reads a BME688 / SEN0617 sensor over I2C and serves the Coffee Odor Monitor page over its own Wi-Fi access point. No home Wi-Fi or Internet connection is required.
 
 ## Hardware
 
@@ -12,7 +12,7 @@ ESP32-S3 reads a BME688 / SEN0617 sensor over I2C and shows the values on a smal
 - BME688 GND -> GND
 - I2C clock: 100 kHz
 
-Note: GPIO19 and GPIO20 are also ESP32-S3 USB D-/D+ pins. Avoid USB pin conflicts when using this wiring.
+Note: GPIO19 and GPIO20 are also ESP32-S3 native USB D-/D+ pins. `platformio.ini` selects COM3 and the board's default `esptool` upload protocol, normally using the USB-to-UART port. Use that port for upload/serial monitoring; do not use the native USB OTG port with the sensor connected. If the board's COM3 is the native USB port, disconnect the sensor during upload and reconnect it afterward.
 
 ## Files
 
@@ -29,22 +29,18 @@ Note: GPIO19 and GPIO20 are also ESP32-S3 USB D-/D+ pins. Avoid USB pin conflict
   README.md
 ```
 
-`include/secrets.h` is ignored by Git and should contain the real Wi-Fi password.
+`include/secrets.h` is ignored by Git and stores the access point credentials locally.
 
-## Wi-Fi Setup
+## Access Point Setup
 
-Copy `include/secrets.example.h` to `include/secrets.h`, then edit only `include/secrets.h`.
+Copy the AP settings from `include/secrets.example.h` into `include/secrets.h` (or add them to the existing file). Set `AP_SSID` to `TownSensor` and set `AP_PASSWORD` to the locally agreed development password. Do not commit `include/secrets.h` or put the password in `src/main.cpp`.
 
-Use this format:
+The device uses `192.168.4.1` and serves HTTP on port 80. The browser API uses a relative URL, so it works from the access point without a home-network address.
 
 ```cpp
-#pragma once
-
-constexpr const char* WIFI_SSID = "JCOM_CHDE";
-constexpr const char* WIFI_PASSWORD = "your-real-wifi-password";
+constexpr const char* AP_SSID = "TownSensor";
+constexpr const char* AP_PASSWORD = "set-locally";
 ```
-
-Do not write the Wi-Fi password directly in `src/main.cpp`.
 
 ## Build
 
@@ -76,7 +72,7 @@ The monitor speed is `115200`, as configured in `platformio.ini`.
 
 ## Expected Serial Output
 
-On a normal boot with working BME688 wiring and Wi-Fi, the Serial Monitor should show lines similar to:
+On boot, the Serial Monitor should show lines similar to:
 
 ```text
 Boot start
@@ -85,16 +81,15 @@ I2C SDA = GPIO20
 I2C SCL = GPIO19
 I2C clock = 100000 Hz
 BME688 detected
-Wi-Fi connection start
-SSID: JCOM_CHDE
-WiFi connected
-SSID: JCOM_CHDE
-IP: 192.168.40.xxx
+Wi-Fi access point start
+SSID: TownSensor
+Access point ready
+IP: 192.168.4.1
 Open:
-http://192.168.40.xxx/
+http://192.168.4.1/
 HTTP server started
 Web URL:
-http://192.168.40.xxx/
+http://192.168.4.1/
 ```
 
 If the sensor is not found, the ESP32 should keep running and print:
@@ -104,34 +99,23 @@ BME688 not detected
 Check wiring, power, I2C pins, and the I2C address 0x76/0x77.
 ```
 
-If Wi-Fi connection fails or times out, the ESP32 should print a status message such as:
+If the access point fails to start, the ESP32 should print:
 
 ```text
-Wi-Fi connection failed or timed out
-SSID: JCOM_CHDE
-Wi-Fi status: WL_CONNECT_FAILED (4)
-Check SSID, password, router, and 2.4 GHz network availability.
+Access point start failed
 ```
 
-## Open From iPhone
+## Outdoor Use From iPad
 
-Make sure the iPhone is connected to the same Wi-Fi network, then check the ESP32 IP address shown in Serial Monitor.
+1. Power the ESP32-S3 from a mobile battery.
+2. In iPad Wi-Fi settings, connect to `TownSensor` using the password configured in `include/secrets.h`.
+3. Open `http://192.168.4.1/` in Safari.
+4. Set a baseline and start the measurement.
+5. Stop the measurement and use Export CSV to save the file from Safari.
 
-If Serial Monitor shows:
+The access point has no Internet connection; iPad may report that the Wi-Fi network has no Internet access. Stay connected to it while using the monitor.
 
-```text
-IP: 192.168.40.123
-Open:
-http://192.168.40.123/
-```
-
-Open this URL in iPhone Safari:
-
-```text
-http://192.168.40.123/
-```
-
-Your iPhone IP is `192.168.40.107` and the router is `192.168.40.1`, so the ESP32 address should normally be another `192.168.40.xxx` address on the same network.
+Sensor reads continue on the ESP32 while the iPad is disconnected. However, Baseline, Measurement samples, graph history, summary, and CSV are held in the browser page's memory, not on the ESP32. A disconnect/reload can therefore pause collection and lose the current page's measurement data; the missing interval is not backfilled after reconnecting. Keep Safari open and connected until CSV export is complete.
 
 ## Web Page
 

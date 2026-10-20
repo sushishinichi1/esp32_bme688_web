@@ -1,7 +1,7 @@
 #pragma once
 
-// Copy this file to include/secrets.h and edit the values for your Wi-Fi.
+// Copy this file to include/secrets.h and set the access point credentials.
 // include/secrets.h is ignored by Git.
 
-constexpr const char* WIFI_SSID = "JCOM_CHDE";
-constexpr const char* WIFI_PASSWORD = "your-wifi-password";
+constexpr const char* AP_SSID = "TownSensor";
+constexpr const char* AP_PASSWORD = "replace-with-local-password";
